@@ -11,8 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Use macos-13 (Intel/x86_64) for consistent artifact availability.
-        os: [ ubuntu-latest, macos-13, windows-latest ]
+        # Use macos-latest to avoid macOS-13 queue bottlenecks.
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
         zig-version: [ 0.15.1 ]
     runs-on: ${{ matrix.os }}
 
@@ -72,23 +72,28 @@ jobs:
           REQUESTED='${{ matrix.zig-version }}'
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             PLATFORM=linux
-            ARCH=x86_64
             EXT=tar.xz
             # Ensure tools are available for extraction and JSON parsing
             sudo apt-get update -y
             sudo apt-get install -y xz-utils jq curl unzip
           else
             PLATFORM=macos
-            ARCH=x86_64
             EXT=tar.xz
-            # Ensure xz is available (brew exists on macOS runners)
+            # Ensure tools on macOS runners
             brew install xz jq || true
           fi
+          # Detect architecture (x86_64 or aarch64)
+          MACHINE="$(uname -m)"
+          case "$MACHINE" in
+            x86_64|amd64) ARCH=x86_64 ;;
+            arm64|aarch64) ARCH=aarch64 ;;
+            *) echo "Unknown architecture: $MACHINE, defaulting to x86_64" >&2; ARCH=x86_64 ;;
+          esac
           TMPDIR="${RUNNER_TEMP}/zigdl"
           mkdir -p "$TMPDIR"
           INDEX_JSON="$TMPDIR/index.json"
           curl -fsSL https://ziglang.org/download/index.json -o "$INDEX_JSON"
-          TRIPLE="x86_64-${PLATFORM}"
+          TRIPLE="${ARCH}-${PLATFORM}"
           ARCHIVE_URL=""; VERSION="$REQUESTED"
           # Helper to resolve an archive URL for a given version
           resolve_url() { jq -r --arg v "$1" --arg t "$TRIPLE" '.[$v][$t] | if . == null then "" else (.tarball // .zip // "") end' "$INDEX_JSON"; }
