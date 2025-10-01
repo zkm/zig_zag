@@ -34,6 +34,8 @@ jobs:
           Expand-Archive -Path $Zip -DestinationPath $Extract -Force
           $ZigPath = Join-Path $Extract "zig-windows-x86_64-$Version"
           echo $ZigPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Export ZIG executable path for subsequent steps
+          echo "ZIG=$ZigPath\zig.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           & "$ZigPath\zig.exe" version
 
       - name: Install Zig (Linux/macOS) ${{ matrix.zig-version }}
@@ -46,20 +48,46 @@ jobs:
             PLATFORM=linux
             ARCH=x86_64
             EXT=tar.xz
+            # Ensure xz is available for extraction
+            sudo apt-get update -y
+            sudo apt-get install -y xz-utils
           else
             PLATFORM=macos
             ARCH=x86_64
             EXT=tar.xz
+            # Ensure xz is available (brew exists on macOS runners)
+            brew install xz || true
           fi
           URL="https://ziglang.org/download/${VERSION}/zig-${PLATFORM}-${ARCH}-${VERSION}.${EXT}"
           echo "Downloading $URL"
           TMPDIR="${RUNNER_TEMP}/zigdl"
           mkdir -p "$TMPDIR"
           curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"
-          tar -xJf "$TMPDIR/zig.${EXT}" -C "$RUNNER_TEMP"
+          # Use portable extraction; -xf will auto-detect when xz is present
+          tar -xf "$TMPDIR/zig.${EXT}" -C "$RUNNER_TEMP"
           ZIGDIR="$RUNNER_TEMP/zig-${PLATFORM}-${ARCH}-${VERSION}"
           echo "$ZIGDIR" >> "$GITHUB_PATH"
+          echo "ZIG=$ZIGDIR/zig" >> "$GITHUB_ENV"
           "$ZIGDIR/zig" version
+
+      - name: Diagnostics (PATH and zig) [Linux/macOS]
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -eux
+          echo "RUNNER_OS=$RUNNER_OS"
+          echo "PATH=$PATH"
+          which zig
+          zig version
+
+      - name: Diagnostics (PATH and zig) [Windows]
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "RUNNER_OS=$env:RUNNER_OS"
+          Write-Host "PATH=$env:Path"
+          Get-Command zig
+          zig version
 
       - name: Show Zig version
         run: zig version
