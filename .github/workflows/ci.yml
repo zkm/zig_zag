@@ -5,14 +5,18 @@ on:
     branches: [ master, main ]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
     name: Build and Test (Zig ${{ matrix.zig-version }})
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        # Use macos-latest to avoid macOS-13 queue bottlenecks.
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ ubuntu-latest, windows-latest ]
         zig-version: [ 0.15.1 ]
     runs-on: ${{ matrix.os }}
 
@@ -64,24 +68,17 @@ jobs:
           echo "ZIG=$ZigPath\zig.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           & "$ZigPath\zig.exe" version
 
-      - name: Install Zig (Linux/macOS) ${{ matrix.zig-version }}
-        if: runner.os != 'Windows'
+      - name: Install Zig (Linux) ${{ matrix.zig-version }}
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euxo pipefail
           REQUESTED='${{ matrix.zig-version }}'
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            PLATFORM=linux
-            EXT=tar.xz
-            # Ensure tools are available for extraction and JSON parsing
-            sudo apt-get update -y
-            sudo apt-get install -y xz-utils jq curl unzip
-          else
-            PLATFORM=macos
-            EXT=tar.xz
-            # Ensure tools on macOS runners
-            brew install xz jq || true
-          fi
+          PLATFORM=linux
+          EXT=tar.xz
+          # Ensure tools are available for extraction and JSON parsing
+          sudo apt-get update -y
+          sudo apt-get install -y xz-utils jq curl unzip
           # Detect architecture (x86_64 or aarch64)
           MACHINE="$(uname -m)"
           case "$MACHINE" in
@@ -116,16 +113,8 @@ jobs:
             if [[ -n "$url" && "$url" != "null" ]]; then ARCHIVE_URL="$url"; VERSION="master"; fi
           fi
           if [[ -z "$ARCHIVE_URL" ]]; then
-            if [[ "$RUNNER_OS" == "macOS" ]]; then
-              echo "Falling back to Homebrew zig on macOS."
-              brew update
-              brew install zig || brew upgrade zig || true
-              zig version
-              exit 0
-            else
-              echo "Failed to resolve a Zig archive URL for $TRIPLE" >&2
-              exit 1
-            fi
+            echo "Failed to resolve a Zig archive URL for $TRIPLE" >&2
+            exit 1
           fi
           echo "Downloading $ARCHIVE_URL"
           DLFILE="$TMPDIR/zig.pkg"
@@ -142,8 +131,8 @@ jobs:
           echo "ZIG=$ZIGDIR/zig" >> "$GITHUB_ENV"
           "$ZIGDIR/zig" version
 
-      - name: Diagnostics (PATH and zig) [Linux/macOS]
-        if: runner.os != 'Windows'
+      - name: Diagnostics (PATH and zig) [Linux]
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           set -eux
