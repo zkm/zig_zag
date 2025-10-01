@@ -13,7 +13,7 @@ jobs:
       matrix:
         # Use macos-13 (Intel/x86_64) for consistent artifact availability.
         os: [ ubuntu-latest, macos-13, windows-latest ]
-        zig-version: [ 0.15.2 ]
+        zig-version: [ 0.15.1 ]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -25,11 +25,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $Version = '${{ matrix.zig-version }}'
-          $Url = "https://ziglang.org/download/$Version/zig-windows-x86_64-$Version.zip"
-          Write-Host "Downloading $Url"
+          $Requested = '${{ matrix.zig-version }}'
+          $Version = $Requested
           $Zip = "$env:RUNNER_TEMP\zig.zip"
-          Invoke-WebRequest -Uri $Url -OutFile $Zip
+          $Extract = "$env:RUNNER_TEMP\zig"
+          function Download-Zig($ver) {
+            $Url = "https://ziglang.org/download/$ver/zig-windows-x86_64-$ver.zip"
+            Write-Host "Downloading $Url"
+            Invoke-WebRequest -Uri $Url -OutFile $Zip -UseBasicParsing
+          }
+          try {
+            Download-Zig $Version
+          } catch {
+            Write-Warning "Failed to download Zig $Version. Falling back to 0.15.1"
+            $Version = '0.15.1'
+            Download-Zig $Version
+          }
           $Extract = "$env:RUNNER_TEMP\zig"
           Expand-Archive -Path $Zip -DestinationPath $Extract -Force
           $ZigPath = Join-Path $Extract "zig-windows-x86_64-$Version"
@@ -43,7 +54,8 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          VERSION='${{ matrix.zig-version }}'
+          REQUESTED='${{ matrix.zig-version }}'
+          VERSION="$REQUESTED"
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             PLATFORM=linux
             ARCH=x86_64
@@ -62,7 +74,13 @@ jobs:
           echo "Downloading $URL"
           TMPDIR="${RUNNER_TEMP}/zigdl"
           mkdir -p "$TMPDIR"
-          curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"
+          if ! curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"; then
+            echo "Primary download failed for $VERSION (likely 404). Falling back to 0.15.1"
+            VERSION="0.15.1"
+            URL="https://ziglang.org/download/${VERSION}/zig-${PLATFORM}-${ARCH}-${VERSION}.${EXT}"
+            echo "Downloading $URL"
+            curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"
+          fi
           # Use portable extraction; -xf will auto-detect when xz is present
           tar -xf "$TMPDIR/zig.${EXT}" -C "$RUNNER_TEMP"
           ZIGDIR="$RUNNER_TEMP/zig-${PLATFORM}-${ARCH}-${VERSION}"
