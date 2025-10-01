@@ -11,38 +11,55 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Use macos-13 (Intel/x86_64) to ensure Zig 0.15.0 artifact availability
+        # Use macos-13 (Intel/x86_64). Pin to Zig 0.14.0 which has broad platform artifacts (incl. Windows).
         os: [ ubuntu-latest, macos-13, windows-latest ]
-        zig-version: [ 0.15.0 ]
+        zig-version: [ 0.14.0 ]
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Zig ${{ matrix.zig-version }}
-        id: setup-zig
+      - name: Install Zig (Windows) ${{ matrix.zig-version }}
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Version = '${{ matrix.zig-version }}'
+          $Url = "https://ziglang.org/download/$Version/zig-windows-x86_64-$Version.zip"
+          Write-Host "Downloading $Url"
+          $Zip = "$env:RUNNER_TEMP\zig.zip"
+          Invoke-WebRequest -Uri $Url -OutFile $Zip
+          $Extract = "$env:RUNNER_TEMP\zig"
+          Expand-Archive -Path $Zip -DestinationPath $Extract -Force
+          $ZigPath = Join-Path $Extract "zig-windows-x86_64-$Version"
+          # Add to PATH for subsequent steps
+          echo $ZigPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Verify
+          & "$ZigPath\zig.exe" version
+
+      - name: Install Zig (Unix) ${{ matrix.zig-version }}
+        if: runner.os != 'Windows'
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: ${{ matrix.zig-version }}
 
-      - name: Fallback install latest Zig (only if specific version unavailable)
-        if: failure()
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: latest
-
       - name: Show Zig version
+        shell: bash
         run: zig version
 
       - name: Format check
+        shell: bash
         run: zig fmt --check .
 
       - name: Build
+        shell: bash
         run: zig build
 
       - name: Run tests
+        shell: bash
         run: zig build test
 
       - name: Smoke run (help)
+        shell: bash
         run: zig build run || true
