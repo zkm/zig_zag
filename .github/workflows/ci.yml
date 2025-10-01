@@ -75,11 +75,20 @@ jobs:
           TMPDIR="${RUNNER_TEMP}/zigdl"
           mkdir -p "$TMPDIR"
           if ! curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"; then
-            echo "Primary download failed for $VERSION (likely 404). Falling back to 0.15.1"
-            VERSION="0.15.1"
-            URL="https://ziglang.org/download/${VERSION}/zig-${PLATFORM}-${ARCH}-${VERSION}.${EXT}"
-            echo "Downloading $URL"
-            curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"
+            echo "Primary download failed for $VERSION (likely 404)."
+            if [[ "$RUNNER_OS" == "macOS" ]]; then
+              echo "Falling back to Homebrew zig on macOS."
+              brew update
+              brew install zig || brew upgrade zig || true
+              zig version
+              exit 0
+            else
+              echo "Falling back to 0.15.1 tarball on Linux."
+              VERSION="0.15.1"
+              URL="https://ziglang.org/download/${VERSION}/zig-${PLATFORM}-${ARCH}-${VERSION}.${EXT}"
+              echo "Downloading $URL"
+              curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"
+            fi
           fi
           # Use portable extraction; -xf will auto-detect when xz is present
           tar -xf "$TMPDIR/zig.${EXT}" -C "$RUNNER_TEMP"
