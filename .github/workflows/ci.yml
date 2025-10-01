@@ -159,7 +159,8 @@ jobs:
       - name: Show Zig version
         run: zig version
 
-      - name: Format check
+      - name: Format check (Linux only)
+        if: runner.os == 'Linux'
         run: zig fmt --check .
 
       - name: Build
