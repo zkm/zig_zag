@@ -1,14 +1,16 @@
 ```
- ╔══════════════════════════════════════╗
- ║  ░░░░ ░░░░░ ░░░░░           ░░░░░░░░  ║
- ║     ░░     ░░    ░░       ░░         ║
- ║    ░░     ░░    ░░       ░░    ░░░░░ ║
- ║   ░░     ░░    ░░ ░░░    ░░       ░░ ║
- ║  ░░░░░ ░░░░░ ░░░░   ░░░ ░░░░░ ░░░░░  ║
- ╚══════════════════════════════════════╝
+ ╔═════════════════════════════════════════╗
+ ║  ░░░░░ ░░░░ ░░░░░  ░░░░░ ░░░░░░  ░░░░░  ║
+ ║     ░░  ░░  ░         ░░ ░░  ░░  ░      ║
+ ║    ░░   ░░  ░  ░░    ░░  ░░░░░░  ░  ░░  ║
+ ║   ░░    ░░  ░   ░   ░░   ░░  ░░  ░   ░  ║
+ ║  ░░░░░ ░░░░ ░░░░░  ░░░░░ ░░  ░░  ░░░░░  ║
+ ╚═════════════════════════════════════════╝
 ```
 
 # zig_zag
+
+[![CI](https://github.com/zkm/zig_zag/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/zkm/zig_zag/actions/workflows/ci.yml)
 
 A Zig project featuring text art generation, mandelbrot fractals, and pattern creation with plenty of **zag**!
 
