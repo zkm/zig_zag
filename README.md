@@ -14,7 +14,7 @@
 
 A Zig project featuring text art generation, mandelbrot fractals, and pattern creation with plenty of **zag**!
 
-## Features ⚡ (with extra zag!)
+## Features ⚡
 - **ASCII Text Art**: Convert text to large ASCII art letters
 - **Banners**: Create decorated text banners in multiple styles  
 - **Patterns**: Generate geometric patterns (checkerboard, triangles, diamonds, waves, and zigzags!)
