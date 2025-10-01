@@ -62,21 +62,16 @@ jobs:
           "$ZIGDIR/zig" version
 
       - name: Show Zig version
-        shell: bash
         run: zig version
 
       - name: Format check
-        shell: bash
         run: zig fmt --check .
 
       - name: Build
-        shell: bash
         run: zig build
 
       - name: Run tests
-        shell: bash
         run: zig build test
 
       - name: Smoke run (help)
-        shell: bash
         run: zig build run || true

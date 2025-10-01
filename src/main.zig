@@ -25,12 +25,12 @@ pub fn main() !void {
             printUsage();
             return;
         }
-        
+
         const width = try std.fmt.parseInt(u32, args[2], 10);
         const height = try std.fmt.parseInt(u32, args[3], 10);
         const max_iter = try std.fmt.parseInt(u16, args[4], 10);
         const output_path = args[5];
-        
+
         try mandelbrot.run(alloc, width, height, max_iter, output_path);
         std.debug.print("Mandelbrot generated: {s}\n", .{output_path});
         return;

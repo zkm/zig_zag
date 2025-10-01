@@ -326,21 +326,21 @@ fn printSimpleBanner(text: []const u8) void {
 fn printBoxBanner(text: []const u8) void {
     const padding = 4;
     const box_width = text.len + padding * 2;
-    
+
     // Top border
     std.debug.print("+", .{});
     for (0..box_width) |_| {
         std.debug.print("-", .{});
     }
     std.debug.print("+\n", .{});
-    
+
     // Empty line
     std.debug.print("|", .{});
     for (0..box_width) |_| {
         std.debug.print(" ", .{});
     }
     std.debug.print("|\n", .{});
-    
+
     // Text line
     std.debug.print("|", .{});
     for (0..padding) |_| {
@@ -351,14 +351,14 @@ fn printBoxBanner(text: []const u8) void {
         std.debug.print(" ", .{});
     }
     std.debug.print("|\n", .{});
-    
+
     // Empty line
     std.debug.print("|", .{});
     for (0..box_width) |_| {
         std.debug.print(" ", .{});
     }
     std.debug.print("|\n", .{});
-    
+
     // Bottom border
     std.debug.print("+", .{});
     for (0..box_width) |_| {
@@ -402,7 +402,7 @@ fn generateTriangle(height: u32) void {
     for (0..height) |y| {
         const spaces = height - y - 1;
         const stars = y * 2 + 1;
-        
+
         for (0..spaces) |_| {
             std.debug.print(" ", .{});
         }
@@ -415,12 +415,12 @@ fn generateTriangle(height: u32) void {
 
 fn generateDiamond(size: u32) void {
     const mid = size / 2;
-    
+
     // Top half
     for (0..mid + 1) |y| {
         const spaces = mid - y;
         const stars = y * 2 + 1;
-        
+
         for (0..spaces) |_| {
             std.debug.print(" ", .{});
         }
@@ -429,13 +429,13 @@ fn generateDiamond(size: u32) void {
         }
         std.debug.print("\n", .{});
     }
-    
+
     // Bottom half
     for (0..mid) |y| {
         const row = mid - y - 1;
         const spaces = mid - row;
         const stars = row * 2 + 1;
-        
+
         for (0..spaces) |_| {
             std.debug.print(" ", .{});
         }
@@ -471,7 +471,7 @@ fn generateZigzag(width: u32, height: u32) void {
             const direction: i32 = if (@rem(cycle_pos, 2) == 0) 1 else -1;
             const offset: i32 = @rem(y, zigzag_period) * direction;
             const center: i32 = @intCast(width / 2);
-            
+
             if (x == center + offset) {
                 std.debug.print("/", .{});
             } else if (x == center + offset + direction) {
