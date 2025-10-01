@@ -55,8 +55,10 @@ jobs:
           }
           if (-not $downloaded) { throw "Unable to download Zig for Windows" }
           Expand-Archive -Path $Zip -DestinationPath $Extract -Force
-          # Find the extracted zig folder dynamically
-          $ZigPath = Get-ChildItem -Path $Extract -Directory | Where-Object { $_.Name -like 'zig-windows-*' } | Select-Object -First 1 | Select-Object -ExpandProperty FullName
+          # Find zig.exe dynamically regardless of folder naming
+          $ZigExe = Get-ChildItem -Path $Extract -Recurse -Filter zig.exe | Select-Object -First 1 | Select-Object -ExpandProperty FullName
+          if (-not $ZigExe) { throw "zig.exe not found after extraction" }
+          $ZigPath = Split-Path -Path $ZigExe -Parent
           echo $ZigPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           # Export ZIG executable path for subsequent steps
           echo "ZIG=$ZigPath\zig.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -72,9 +74,9 @@ jobs:
             PLATFORM=linux
             ARCH=x86_64
             EXT=tar.xz
-            # Ensure xz is available for extraction
+            # Ensure tools are available for extraction and JSON parsing
             sudo apt-get update -y
-            sudo apt-get install -y xz-utils jq curl
+            sudo apt-get install -y xz-utils jq curl unzip
           else
             PLATFORM=macos
             ARCH=x86_64
@@ -87,17 +89,27 @@ jobs:
           INDEX_JSON="$TMPDIR/index.json"
           curl -fsSL https://ziglang.org/download/index.json -o "$INDEX_JSON"
           TRIPLE="x86_64-${PLATFORM}"
-          # Build candidate versions list: requested, all 0.15.x (desc), then master
-          mapfile -t CANDIDATES < <(jq -r 'keys[]' "$INDEX_JSON" | awk '/^0\.15\./{print}' | sort -Vr)
-          CANDIDATES=("$REQUESTED" "${CANDIDATES[@]}" master)
-          ARCHIVE_URL=""
-          for ver in "${CANDIDATES[@]}"; do
-            [[ -z "$ver" ]] && continue
-            url=$(jq -r --arg v "$ver" --arg t "$TRIPLE" '.[$v][$t] | if . == null then "" else (.tarball // .zip // "") end' "$INDEX_JSON")
-            if [[ -n "$url" && "$url" != "null" ]]; then
-              ARCHIVE_URL="$url"; VERSION="$ver"; break
+          ARCHIVE_URL=""; VERSION="$REQUESTED"
+          # Helper to resolve an archive URL for a given version
+          resolve_url() { jq -r --arg v "$1" --arg t "$TRIPLE" '.[$v][$t] | if . == null then "" else (.tarball // .zip // "") end' "$INDEX_JSON"; }
+          # Try requested version first if provided
+          if [[ -n "$REQUESTED" ]]; then
+            url=$(resolve_url "$REQUESTED")
+            if [[ -n "$url" && "$url" != "null" ]]; then ARCHIVE_URL="$url"; VERSION="$REQUESTED"; fi
+          fi
+          # Then try the latest 0.15.x available
+          if [[ -z "$ARCHIVE_URL" ]]; then
+            LATEST_015=$(jq -r '[keys[] | select(test("^0\\.15\\."))] | sort_by(split(".") | map(tonumber)) | last // empty' "$INDEX_JSON")
+            if [[ -n "$LATEST_015" ]]; then
+              url=$(resolve_url "$LATEST_015")
+              if [[ -n "$url" && "$url" != "null" ]]; then ARCHIVE_URL="$url"; VERSION="$LATEST_015"; fi
             fi
-          done
+          fi
+          # Finally, try master
+          if [[ -z "$ARCHIVE_URL" ]]; then
+            url=$(resolve_url "master")
+            if [[ -n "$url" && "$url" != "null" ]]; then ARCHIVE_URL="$url"; VERSION="master"; fi
+          fi
           if [[ -z "$ARCHIVE_URL" ]]; then
             if [[ "$RUNNER_OS" == "macOS" ]]; then
               echo "Falling back to Homebrew zig on macOS."
@@ -111,10 +123,16 @@ jobs:
             fi
           fi
           echo "Downloading $ARCHIVE_URL"
-          curl -fsSL "$ARCHIVE_URL" -o "$TMPDIR/zig.${EXT}"
-          # Use portable extraction; -xf will auto-detect when xz is present
-          tar -xf "$TMPDIR/zig.${EXT}" -C "$RUNNER_TEMP"
-          ZIGDIR=$(find "$RUNNER_TEMP" -maxdepth 1 -type d -name "zig-*-$VERSION" | head -n1)
+          DLFILE="$TMPDIR/zig.pkg"
+          curl -fsSL "$ARCHIVE_URL" -o "$DLFILE"
+          # Extract depending on archive type
+          if [[ "$ARCHIVE_URL" == *.zip ]]; then
+            unzip -q "$DLFILE" -d "$RUNNER_TEMP"
+          else
+            tar -xf "$DLFILE" -C "$RUNNER_TEMP"
+          fi
+          # Find the directory containing the zig executable
+          ZIGDIR=$(find "$RUNNER_TEMP" -maxdepth 3 -type f -name zig -print -quit | xargs dirname)
           echo "$ZIGDIR" >> "$GITHUB_PATH"
           echo "ZIG=$ZIGDIR/zig" >> "$GITHUB_ENV"
           "$ZIGDIR/zig" version
