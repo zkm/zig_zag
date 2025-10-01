@@ -26,24 +26,37 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $Requested = '${{ matrix.zig-version }}'
-          $Version = $Requested
           $Zip = "$env:RUNNER_TEMP\zig.zip"
           $Extract = "$env:RUNNER_TEMP\zig"
-          function Download-Zig($ver) {
-            $Url = "https://ziglang.org/download/$ver/zig-windows-x86_64-$ver.zip"
-            Write-Host "Downloading $Url"
-            Invoke-WebRequest -Uri $Url -OutFile $Zip -UseBasicParsing
+          $Index = Invoke-WebRequest -Uri https://ziglang.org/download/index.json -UseBasicParsing | Select-Object -ExpandProperty Content | ConvertFrom-Json
+          $candidates = @()
+          if ($Requested) { $candidates += $Requested }
+          # Prefer available 0.15.x versions descending
+          $candidates += ($Index.PSObject.Properties.Name | Where-Object { $_ -match '^0\.15\.' } | Sort-Object -Descending)
+          $candidates += 'master'
+          $downloaded = $false
+          foreach ($ver in $candidates) {
+            $entry = $Index.PSObject.Properties[$ver].Value
+            if ($null -eq $entry) { continue }
+            $win = $entry.PSObject.Properties["x86_64-windows"].Value
+            if ($null -eq $win) { continue }
+            $url = $win.zip
+            if (-not $url) { $url = $win.tarball }
+            if (-not $url) { continue }
+            Write-Host "Downloading $url"
+            try {
+              Invoke-WebRequest -Uri $url -OutFile $Zip -UseBasicParsing
+              $Version = $ver
+              $downloaded = $true
+              break
+            } catch {
+              Write-Warning "Failed to download $url"
+            }
           }
-          try {
-            Download-Zig $Version
-          } catch {
-            Write-Warning "Failed to download Zig $Version. Falling back to 0.15.1"
-            $Version = '0.15.1'
-            Download-Zig $Version
-          }
-          $Extract = "$env:RUNNER_TEMP\zig"
+          if (-not $downloaded) { throw "Unable to download Zig for Windows" }
           Expand-Archive -Path $Zip -DestinationPath $Extract -Force
-          $ZigPath = Join-Path $Extract "zig-windows-x86_64-$Version"
+          # Find the extracted zig folder dynamically
+          $ZigPath = Get-ChildItem -Path $Extract -Directory | Where-Object { $_.Name -like 'zig-windows-*' } | Select-Object -First 1 | Select-Object -ExpandProperty FullName
           echo $ZigPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           # Export ZIG executable path for subsequent steps
           echo "ZIG=$ZigPath\zig.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -55,27 +68,37 @@ jobs:
         run: |
           set -euxo pipefail
           REQUESTED='${{ matrix.zig-version }}'
-          VERSION="$REQUESTED"
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             PLATFORM=linux
             ARCH=x86_64
             EXT=tar.xz
             # Ensure xz is available for extraction
             sudo apt-get update -y
-            sudo apt-get install -y xz-utils
+            sudo apt-get install -y xz-utils jq curl
           else
             PLATFORM=macos
             ARCH=x86_64
             EXT=tar.xz
             # Ensure xz is available (brew exists on macOS runners)
-            brew install xz || true
+            brew install xz jq || true
           fi
-          URL="https://ziglang.org/download/${VERSION}/zig-${PLATFORM}-${ARCH}-${VERSION}.${EXT}"
-          echo "Downloading $URL"
           TMPDIR="${RUNNER_TEMP}/zigdl"
           mkdir -p "$TMPDIR"
-          if ! curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"; then
-            echo "Primary download failed for $VERSION (likely 404)."
+          INDEX_JSON="$TMPDIR/index.json"
+          curl -fsSL https://ziglang.org/download/index.json -o "$INDEX_JSON"
+          TRIPLE="x86_64-${PLATFORM}"
+          # Build candidate versions list: requested, all 0.15.x (desc), then master
+          mapfile -t CANDIDATES < <(jq -r 'keys[]' "$INDEX_JSON" | awk '/^0\.15\./{print}' | sort -Vr)
+          CANDIDATES=("$REQUESTED" "${CANDIDATES[@]}" master)
+          ARCHIVE_URL=""
+          for ver in "${CANDIDATES[@]}"; do
+            [[ -z "$ver" ]] && continue
+            url=$(jq -r --arg v "$ver" --arg t "$TRIPLE" '.[$v][$t] | if . == null then "" else (.tarball // .zip // "") end' "$INDEX_JSON")
+            if [[ -n "$url" && "$url" != "null" ]]; then
+              ARCHIVE_URL="$url"; VERSION="$ver"; break
+            fi
+          done
+          if [[ -z "$ARCHIVE_URL" ]]; then
             if [[ "$RUNNER_OS" == "macOS" ]]; then
               echo "Falling back to Homebrew zig on macOS."
               brew update
@@ -83,16 +106,15 @@ jobs:
               zig version
               exit 0
             else
-              echo "Falling back to 0.15.1 tarball on Linux."
-              VERSION="0.15.1"
-              URL="https://ziglang.org/download/${VERSION}/zig-${PLATFORM}-${ARCH}-${VERSION}.${EXT}"
-              echo "Downloading $URL"
-              curl -fsSL "$URL" -o "$TMPDIR/zig.${EXT}"
+              echo "Failed to resolve a Zig archive URL for $TRIPLE" >&2
+              exit 1
             fi
           fi
+          echo "Downloading $ARCHIVE_URL"
+          curl -fsSL "$ARCHIVE_URL" -o "$TMPDIR/zig.${EXT}"
           # Use portable extraction; -xf will auto-detect when xz is present
           tar -xf "$TMPDIR/zig.${EXT}" -C "$RUNNER_TEMP"
-          ZIGDIR="$RUNNER_TEMP/zig-${PLATFORM}-${ARCH}-${VERSION}"
+          ZIGDIR=$(find "$RUNNER_TEMP" -maxdepth 1 -type d -name "zig-*-$VERSION" | head -n1)
           echo "$ZIGDIR" >> "$GITHUB_PATH"
           echo "ZIG=$ZIGDIR/zig" >> "$GITHUB_ENV"
           "$ZIGDIR/zig" version
