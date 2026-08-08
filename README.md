@@ -22,7 +22,7 @@ A Zig project featuring text art generation, mandelbrot fractals, and pattern cr
 - **Zigzag Patterns**: Because you can never have too much zag!
 
 ## Requirements
-- Zig 0.15.x (detected during setup)
+- Zig 0.16.x (detected during setup)
 
 ## Quick start
 

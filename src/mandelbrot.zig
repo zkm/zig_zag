@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn run(alloc: std.mem.Allocator, width: u32, height: u32, max_iter: u16, out_path: []const u8) !void {
+pub fn run(alloc: std.mem.Allocator, io: std.Io, width: u32, height: u32, max_iter: u16, out_path: []const u8) !void {
     // Prepare buffer: RGB per pixel
     const pixel_count = @as(usize, width) * @as(usize, height);
     const buf = try alloc.alloc(u8, pixel_count * 3);
@@ -28,14 +28,14 @@ pub fn run(alloc: std.mem.Allocator, width: u32, height: u32, max_iter: u16, out
     for (threads) |t| t.join();
 
     // Write PPM (P6)
-    var file = try std.fs.cwd().createFile(out_path, .{ .read = false, .truncate = true, .exclusive = false });
-    defer file.close();
+    const file = try std.Io.Dir.cwd().createFile(io, out_path, .{ .read = false, .truncate = true, .exclusive = false });
+    defer file.close(io);
 
     // Write header
     var header_buf: [64]u8 = undefined;
     const header = try std.fmt.bufPrint(&header_buf, "P6\n{d} {d}\n255\n", .{ width, height });
-    try file.writeAll(header);
-    try file.writeAll(buf);
+    try file.writeStreamingAll(io, header);
+    try file.writeStreamingAll(io, buf);
 }
 
 fn noop() void {}

@@ -2,13 +2,9 @@ const std = @import("std");
 const mandelbrot = @import("mandelbrot.zig");
 const textart = @import("textart.zig");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
-
-    const args = try std.process.argsAlloc(alloc);
-    defer std.process.argsFree(alloc, args);
+pub fn main(init: std.process.Init) !void {
+    const alloc = init.gpa;
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
 
     if (args.len == 1) {
         printUsage();
@@ -31,7 +27,7 @@ pub fn main() !void {
         const max_iter = try std.fmt.parseInt(u16, args[4], 10);
         const output_path = args[5];
 
-        try mandelbrot.run(alloc, width, height, max_iter, output_path);
+        try mandelbrot.run(alloc, init.io, width, height, max_iter, output_path);
         std.debug.print("Mandelbrot generated: {s}\n", .{output_path});
         return;
     }

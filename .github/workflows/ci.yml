@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest ]
-        zig-version: [ 0.15.1 ]
+        zig-version: [ 0.16.0 ]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -35,8 +35,8 @@ jobs:
           $Index = Invoke-WebRequest -Uri https://ziglang.org/download/index.json -UseBasicParsing | Select-Object -ExpandProperty Content | ConvertFrom-Json
           $candidates = @()
           if ($Requested) { $candidates += $Requested }
-          # Prefer available 0.15.x versions descending
-          $candidates += ($Index.PSObject.Properties.Name | Where-Object { $_ -match '^0\.15\.' } | Sort-Object -Descending)
+          # Prefer available 0.16.x versions descending
+          $candidates += ($Index.PSObject.Properties.Name | Where-Object { $_ -match '^0\.16\.' } | Sort-Object -Descending)
           $candidates += 'master'
           $downloaded = $false
           foreach ($ver in $candidates) {
@@ -99,12 +99,12 @@ jobs:
             url=$(resolve_url "$REQUESTED")
             if [[ -n "$url" && "$url" != "null" ]]; then ARCHIVE_URL="$url"; VERSION="$REQUESTED"; fi
           fi
-          # Then try the latest 0.15.x available
+          # Then try the latest 0.16.x available
           if [[ -z "$ARCHIVE_URL" ]]; then
-            LATEST_015=$(jq -r '[keys[] | select(test("^0\\.15\\."))] | sort_by(split(".") | map(tonumber)) | last // empty' "$INDEX_JSON")
-            if [[ -n "$LATEST_015" ]]; then
-              url=$(resolve_url "$LATEST_015")
-              if [[ -n "$url" && "$url" != "null" ]]; then ARCHIVE_URL="$url"; VERSION="$LATEST_015"; fi
+            LATEST_016=$(jq -r '[keys[] | select(test("^0\\.16\\."))] | sort_by(split(".") | map(tonumber)) | last // empty' "$INDEX_JSON")
+            if [[ -n "$LATEST_016" ]]; then
+              url=$(resolve_url "$LATEST_016")
+              if [[ -n "$url" && "$url" != "null" ]]; then ARCHIVE_URL="$url"; VERSION="$LATEST_016"; fi
             fi
           fi
           # Finally, try master
