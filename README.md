@@ -10,7 +10,10 @@
 
 # zig_zag
 
-[![CI](https://github.com/zkm/zig_zag/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/zkm/zig_zag/actions/workflows/ci.yml)
+[![CI](https://github.com/zkm/zig_zag/actions/workflows/ci.yml/badge.svg)](https://github.com/zkm/zig_zag/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+![Zig 0.16](https://img.shields.io/badge/Zig-0.16-F7A41D?logo=zig&logoColor=white)
 
 A Zig project featuring text art generation, mandelbrot fractals, and pattern creation with plenty of **zag**!
 
